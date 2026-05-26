@@ -62,7 +62,7 @@ def minimize_marginals(graph, initial_estimate, pose_options):
             temp_estimate = gtsam.Values(initial_estimate)
             temp_graph, temp_estimate = add_pose(temp_graph, temp_estimate, pose_5)
             temp_result = optimize(temp_graph, temp_estimate)
-            temp_graph = add_landmark_measurement(temp_graph, temp_estimate, pose_5, l)
+            temp_graph = add_landmark_measurement(temp_graph, temp_result, pose_5, l)
             final_result = optimize(temp_graph, temp_estimate)
             
             marginals = gtsam.Marginals(temp_graph, final_result)
@@ -85,8 +85,14 @@ def minimize_errors(graph, initial_estimate, pose_options):
     
     best_pose = None
     best_landmark = None
-    min_error = float('inf')
+    min_sum_of_errors = float('inf')
     landmarks = [1, 2]
+    poses = [1, 2, 3]
+    ideal_poses = {
+        1: gtsam.Point2(0.0, 0.0),
+        2: gtsam.Point2(2.0, 0.0),
+        3: gtsam.Point2(4.0, 0.0)
+    }
 
     for x, pose_5 in pose_options.items():
         for l in landmarks:
@@ -96,13 +102,19 @@ def minimize_errors(graph, initial_estimate, pose_options):
             temp_result = optimize(temp_graph, temp_estimate)
             temp_graph = add_landmark_measurement(temp_graph, temp_result, pose_5, l)
             final_result = optimize(temp_graph, temp_estimate)
-            
-            temp_error = temp_graph.error(final_result)
-            list_of_errors.append(temp_error)
-            if temp_error < min_error:
-                min_error = temp_error
+
+            for i in poses:
+                est_pose = final_result.atPose2(X(i))
+                ideal_point = ideal_poses[i]
+                
+                error = np.sqrt((est_pose.x() - ideal_point[0])**2 + (est_pose.y() - ideal_point[1])**2)
+                list_of_errors.append(error)
+
+            sum_of_errors = sum(list_of_errors)
+
+            if sum_of_errors < min_sum_of_errors:
+                min_sum_of_errors = sum_of_errors
                 best_pose = x
                 best_landmark = l
-
-    sum_of_errors = sum(list_of_errors)
-    return best_pose, best_landmark, sum_of_errors 
+   
+    return best_pose, best_landmark, min_sum_of_errors 
